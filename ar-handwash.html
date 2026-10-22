@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>洗手五步驟 AR</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-v1.5.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
+<style>
+:root{--glass:rgba(16,40,52,.8);--ink:#f3f8fa;--muted:#b7cdd6;--water:#4fb6e8;--sun:#ffd15c;
+  --font:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--ink);font-family:var(--font)}
+.hud{position:fixed;left:0;right:0;z-index:10;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.top{top:0;padding-top:calc(env(safe-area-inset-top,0px) + 10px)}
+.bottom{bottom:0;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
+.pill{display:inline-flex;gap:8px;align-items:center;background:var(--glass);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px}
+.dot{width:10px;height:10px;border-radius:50%;background:#e8665a}
+.found .dot{background:#4fd18b}
+.card{background:var(--glass);border-radius:18px;padding:12px 14px;max-width:560px;margin:0 auto;display:grid;gap:10px}
+.step{display:flex;gap:12px;align-items:center}
+.step .e{font-size:40px}
+.step h1{margin:0;font-size:24px;font-weight:900}
+.step p{margin:2px 0 0;color:var(--muted);font-size:15px}
+.dots{display:flex;gap:6px}
+.dots span{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.2)}
+.dots span.on{background:var(--water)}
+.row{display:flex;gap:8px}
+button{flex:1;font:inherit;font-weight:700;font-size:16px;border:0;border-radius:12px;padding:11px;background:var(--ink);color:#10282f;cursor:pointer}
+button.alt{background:rgba(255,255,255,.14);color:var(--ink)}
+button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.help{font-size:13px;color:var(--muted);margin:0}
+.help a{color:var(--sun)}
+</style>
+</head>
+<body>
+<a-scene embedded vr-mode-ui="enabled:false" renderer="logarithmicDepthBuffer:true; colorManagement:true"
+  arjs="sourceType:webcam; debugUIEnabled:false; detectionMode:mono_and_matrix;">
+  <a-marker preset="hiro" id="marker" smooth="true" smoothCount="5">
+    <a-entity id="anchor">
+      <!-- floating step card -->
+      <a-plane id="cardPlane" position="0 0.75 0" width="1.4" height="1.4" material="transparent:true"
+        animation="property:position; from:0 0.7 0; to:0 0.82 0; dir:alternate; loop:true; dur:1400; easing:easeInOutSine"></a-plane>
+      <!-- basin -->
+      <a-cylinder position="0 0 0" radius="0.6" height="0.08" color="#e9f3f7"></a-cylinder>
+      <a-entity id="fx"></a-entity>
+    </a-entity>
+  </a-marker>
+  <a-entity camera></a-entity>
+</a-scene>
+
+<div class="hud top"><span class="pill" id="status"><span class="dot"></span><span id="statusText">請把鏡頭對準 Hiro 標記</span></span></div>
+<div class="hud bottom">
+  <div class="card">
+    <div class="step"><span class="e" id="sE"></span><div><h1 id="sT"></h1><p id="sD"></p></div></div>
+    <div class="dots" id="dots"></div>
+    <div class="row">
+      <button class="alt" id="prev">上一步</button>
+      <button class="alt" id="say">🔊 念出來</button>
+      <button id="next">下一步</button>
+    </div>
+    <p class="help">沒有標記？在另一台裝置打開或列印 <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" target="_blank" rel="noopener">Hiro 標記圖</a></p>
+  </div>
+</div>
+
+<script>
+const STEPS=[
+  {k:"濕",e:"💧",t:"濕：打開水龍頭",d:"把兩隻手弄濕",c:"#4fb6e8",fx:"drops"},
+  {k:"搓",e:"🧼",t:"搓：抹肥皂搓手",d:"手心、手背、指縫、指尖都要搓，數到 20",c:"#b49ae0",fx:"bubbles"},
+  {k:"沖",e:"🚿",t:"沖：用水沖乾淨",d:"把泡泡全部沖掉",c:"#3fbfb0",fx:"drops"},
+  {k:"捧",e:"🤲",t:"捧：捧水沖水龍頭",d:"把水龍頭也沖乾淨再關水",c:"#6aa7ff",fx:"drops"},
+  {k:"擦",e:"🧻",t:"擦：擦乾雙手",d:"用乾淨的紙巾或毛巾擦乾",c:"#ffb14a",fx:"none"}
+];
+const FONT='"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif';
+function cardImg(s,i){
+  const c=document.createElement('canvas');c.width=512;c.height=512;const x=c.getContext('2d');
+  x.fillStyle=s.c;x.beginPath();x.roundRect(8,8,496,496,60);x.fill();
+  x.fillStyle='rgba(255,255,255,.92)';x.beginPath();x.roundRect(40,40,432,300,40);x.fill();
+  x.textAlign='center';x.textBaseline='middle';
+  x.font='190px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';x.fillText(s.e,256,196);
+  x.fillStyle='#10282f';x.font='900 110px '+FONT;x.fillText(s.k,256,420);
+  x.font='700 36px '+FONT;x.fillStyle='rgba(16,40,47,.7)';x.fillText((i+1)+' / 5',440,470);
+  return c.toDataURL();
+}
+let i=0;const $=id=>document.getElementById(id);
+function say(t){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='zh-TW';u.rate=.85;speechSynthesis.speak(u);}catch(e){}}
+function fx(type){
+  const f=$('fx');f.innerHTML='';
+  if(type==='none')return;
+  for(let n=0;n<10;n++){
+    const s=document.createElement('a-sphere');
+    const x=(Math.random()-.5)*1, z=(Math.random()-.5)*.6, r=type==='bubbles'?0.05+Math.random()*.07:0.03;
+    s.setAttribute('radius',r);
+    s.setAttribute('material',type==='bubbles'?'color:#ffffff; opacity:.6; transparent:true; metalness:.3; roughness:.1':'color:#4fb6e8; opacity:.85; transparent:true');
+    const from=type==='bubbles'?`${x} 0.1 ${z}`:`${x} 1.4 ${z}`, to=type==='bubbles'?`${x} 1.3 ${z}`:`${x} 0.05 ${z}`;
+    s.setAttribute('position',from);
+    s.setAttribute('animation',`property:position; from:${from}; to:${to}; dur:${1200+Math.random()*1200}; loop:true; delay:${Math.random()*1000}; easing:linear`);
+    f.appendChild(s);
+  }
+}
+function show(){
+  const s=STEPS[i];
+  $('sE').textContent=s.e;$('sT').textContent=s.t;$('sD').textContent=s.d;
+  $('dots').innerHTML=STEPS.map((_,n)=>`<span class="${n<=i?'on':''}"></span>`).join('');
+  $('cardPlane').setAttribute('material','src',cardImg(s,i));
+  $('prev').disabled=i===0;$('next').textContent=i===STEPS.length-1?'再洗一次':'下一步';
+  fx(s.fx);
+}
+$('next').onclick=()=>{i=(i+1)%STEPS.length;show();say(STEPS[i].t+'。'+STEPS[i].d)};
+$('prev').onclick=()=>{if(i>0){i--;show();say(STEPS[i].t+'。'+STEPS[i].d)}};
+$('say').onclick=()=>say(STEPS[i].t+'。'+STEPS[i].d);
+const m=$('marker');
+m.addEventListener('markerFound',()=>{$('status').classList.add('found');$('statusText').textContent='找到標記了！';});
+m.addEventListener('markerLost',()=>{$('status').classList.remove('found');$('statusText').textContent='請把鏡頭對準 Hiro 標記';});
+document.querySelector('a-scene').addEventListener('loaded',show);
+</script>
+</body>
+</html>

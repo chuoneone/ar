@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}</style></head><body>
+<title>米克超商 VR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-v1.5.0.min.js"></script>
+<style>
+/* Layout: full-bleed 3D store, glass HUD pinned top (round/score) and bottom (shopping list + actions) */
+:root{
+  --glass: rgba(20,32,38,.78);
+  --ink: #f4f7f5;
+  --muted: #b9c8c4;
+  --mint: #3fbf9f;
+  --sun: #ffc94a;
+  --coral: #ff7a66;
+  --font: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  color-scheme: dark;
+}
+html,body{height:100%;background:#20302f;color:var(--ink);font-family:var(--font);overflow:hidden}
+a-scene{position:fixed;inset:0}
+.hud{position:fixed;left:0;right:0;z-index:5;pointer-events:none;
+  padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.hud > *{pointer-events:auto}
+.top{top:0;padding-top:calc(env(safe-area-inset-top,0px) + 10px);display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.pill{background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:999px;padding:6px 14px;font-weight:700;font-size:14px;display:flex;gap:10px;align-items:center}
+.pill b{color:var(--sun);font-variant-numeric:tabular-nums}
+.hint{font-weight:500;color:var(--muted);font-size:13px}
+.bottom{bottom:0;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
+.card{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:18px;padding:12px 14px;max-width:560px;margin:0 auto;display:grid;gap:10px}
+.card h2{margin:0;font-size:13px;letter-spacing:.12em;color:var(--muted);font-weight:700}
+.list{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:12px;background:rgba(255,255,255,.1);font-size:18px;font-weight:700;transition:background .3s}
+.chip .e{font-size:22px}
+.chip.done{background:var(--mint);color:#0d2a23}
+.chip.done::after{content:"✓";font-weight:900}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-weight:700;font-size:15px;border:0;border-radius:12px;padding:10px 14px;cursor:pointer;color:#14201f;background:var(--ink)}
+button.alt{background:rgba(255,255,255,.14);color:var(--ink)}
+button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.lvl{display:flex;gap:4px;margin-left:auto;align-items:center;font-size:13px;color:var(--muted)}
+.lvl button{padding:8px 11px}
+.lvl button[aria-pressed="true"]{background:var(--sun);color:#2a2000}
+.toast{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.9);z-index:6;background:var(--glass);border-radius:20px;padding:16px 22px;font-size:24px;font-weight:900;opacity:0;transition:.25s;pointer-events:none;text-align:center;max-width:86vw}
+.toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.toast.good{color:var(--mint)} .toast.bad{color:var(--coral)} .toast.win{color:var(--sun)}
+@media (prefers-reduced-motion:reduce){.toast,.chip{transition:none}}
+</style>
+
+<a-scene renderer="antialias:true; colorManagement:true" vr-mode-ui="enabled:true" cursor="rayOrigin: mouse" raycaster="objects: .clickable" loading-screen="dotsColor:#3fbf9f; backgroundColor:#20302f">
+  <a-assets id="assets"></a-assets>
+  <a-sky color="#dfe9e6"></a-sky>
+  <a-entity light="type:ambient; intensity:.75"></a-entity>
+  <a-entity light="type:directional; intensity:.7" position="2 6 3"></a-entity>
+  <!-- floor & walls -->
+  <a-plane rotation="-90 0 0" width="12" height="12" color="#e8e2d4"></a-plane>
+  <a-plane position="0 0.002 0" rotation="-90 0 0" width="1.6" height="1.6" color="#3fbf9f" opacity=".25"></a-plane>
+  <a-plane position="0 2 -5" width="12" height="4" color="#f3f6f4"></a-plane>
+  <a-plane position="-5 2 0" rotation="0 90 0" width="12" height="4" color="#eef3f1"></a-plane>
+  <a-plane position="5 2 0" rotation="0 -90 0" width="12" height="4" color="#eef3f1"></a-plane>
+  <a-plane position="0 2 5" rotation="0 180 0" width="12" height="4" color="#f3f6f4"></a-plane>
+  <a-box position="0 3.9 0" width="10" depth="10" height=".1" color="#fafafa"></a-box>
+  <a-entity id="store"></a-entity>
+  <a-entity id="rig" position="0 0 0">
+    <a-entity id="cam" camera look-controls="magicWindowTrackingEnabled:false; touchEnabled:true" wasd-controls="enabled:false" position="0 1.6 0">
+      <a-entity cursor="fuse:true; fuseTimeout:1200" raycaster="objects: .clickable" position="0 0 -1"
+        geometry="primitive:ring; radiusInner:.012; radiusOuter:.02" material="color:#14201f; shader:flat"
+        animation__fuse="startEvents:fusing; property:scale; from:1 1 1; to:.3 .3 .3; dur:1200"
+        animation__reset="startEvents:mouseleave; property:scale; to:1 1 1; dur:100"></a-entity>
+    </a-entity>
+  </a-entity>
+</a-scene>
+
+<div class="hud top">
+  <div class="pill">第 <b id="round">1</b> 輪　得分 <b id="score">0</b></div>
+  <div class="pill hint">拖曳畫面轉頭看看</div>
+</div>
+<div class="hud bottom">
+  <div class="card">
+    <h2 id="listTitle">購物清單：找到並點選商品</h2>
+    <div class="list" id="list"></div>
+    <div class="row">
+      <button id="speak">🔊 念出清單</button>
+      <button class="alt" id="next">換一張清單</button>
+      <div class="lvl">數量
+        <button class="alt" data-n="2" aria-pressed="true">2</button>
+        <button class="alt" data-n="3">3</button>
+        <button class="alt" data-n="4">4</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ITEMS=[
+ {e:"🥛",n:"牛奶",c:"#7fb3e6"},{e:"🍞",n:"麵包",c:"#e0a96d"},{e:"🍙",n:"飯糰",c:"#9bc77a"},{e:"🧃",n:"果汁",c:"#ffb14a"},
+ {e:"🍎",n:"蘋果",c:"#e8665a"},{e:"🍌",n:"香蕉",c:"#f2d250"},{e:"🥚",n:"雞蛋",c:"#efe2c8"},{e:"🍪",n:"餅乾",c:"#c98d5a"},
+ {e:"🍜",n:"泡麵",c:"#f0825f"},{e:"🧻",n:"衛生紙",c:"#cfd8dc"},{e:"🪥",n:"牙刷",c:"#6fc4c0"},{e:"🧼",n:"肥皂",c:"#b49ae0"}
+];
+const FONT='"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif';
+function label(emoji,name,bg){
+  const c=document.createElement('canvas');c.width=256;c.height=320;const x=c.getContext('2d');
+  x.fillStyle=bg;x.fillRect(0,0,256,320);
+  x.fillStyle='rgba(255,255,255,.9)';x.beginPath();x.roundRect(16,16,224,224,28);x.fill();
+  x.font='150px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';x.textAlign='center';x.textBaseline='middle';
+  x.fillText(emoji,128,134);
+  x.fillStyle='#14201f';x.font='900 52px '+FONT;x.fillText(name,128,282);
+  return c.toDataURL();
+}
+function sign(text,bg,fg){
+  const c=document.createElement('canvas');c.width=512;c.height=128;const x=c.getContext('2d');
+  x.fillStyle=bg;x.fillRect(0,0,512,128);x.fillStyle=fg;x.font='900 64px '+FONT;x.textAlign='center';x.textBaseline='middle';
+  x.fillText(text,256,68);return c.toDataURL();
+}
+const store=document.getElementById('store');
+// three shelves (front, left, right), 4 items each, counter behind
+const shelves=[{rot:0,pos:[0,0,-3.2],title:"早餐・飲料"},{rot:90,pos:[-3.2,0,0],title:"零食・水果"},{rot:-90,pos:[3.2,0,0],title:"生活用品"}];
+const order=[0,1,2,3,4,5,6,7,8,9,10,11];
+shelves.forEach((s,si)=>{
+  const g=document.createElement('a-entity');
+  g.setAttribute('position',s.pos.join(' '));g.setAttribute('rotation',`0 ${s.rot} 0`);
+  g.innerHTML=`<a-box position="0 .9 -.3" width="3.4" height="1.8" depth=".5" color="#5a7c76"></a-box>
+    <a-box position="0 .55 -.05" width="3.4" height=".05" depth=".55" color="#d9e4e1"></a-box>
+    <a-plane position="0 2.15 -.3" width="2.4" height=".6" src="${sign(s.title,'#14201f','#ffc94a')}"></a-plane>`;
+  for(let i=0;i<4;i++){
+    const it=ITEMS[order[si*4+i]];const idx=order[si*4+i];
+    const p=document.createElement('a-entity');
+    p.setAttribute('position',`${-1.2+i*0.8} 1.05 0`);
+    p.innerHTML=`<a-box class="clickable" data-idx="${idx}" width=".6" height=".75" depth=".3" color="${it.c}"
+        animation__hover="startEvents:mouseenter; property:scale; to:1.08 1.08 1.08; dur:150"
+        animation__out="startEvents:mouseleave; property:scale; to:1 1 1; dur:150"></a-box>
+      <a-plane position="0 0 .152" width=".56" height=".7" src="${label(it.e,it.n,it.c)}"></a-plane>`;
+    g.appendChild(p);
+  }
+  store.appendChild(g);
+});
+const counter=document.createElement('a-entity');
+counter.setAttribute('position','0 0 3.2');counter.setAttribute('rotation','0 180 0');
+counter.innerHTML=`<a-box class="clickable" id="register" position="0 .55 0" width="2.2" height="1.1" depth=".8" color="#3fbf9f"></a-box>
+  <a-box position=".6 1.25 0" width=".6" height=".3" depth=".4" color="#14201f"></a-box>
+  <a-plane position="0 2.1 0" width="2.4" height=".6" src="${sign('🧾 收銀台・結帳','#ffc94a','#14201f')}"></a-plane>`;
+store.appendChild(counter);
+
+let level=2,targets=[],got=new Set(),score=0,round=1;
+const $=id=>document.getElementById(id);
+function say(t){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='zh-TW';u.rate=.9;speechSynthesis.speak(u);}catch(e){}}
+let tt;function toast(t,cls){const el=$('toast');el.textContent=t;el.className='toast show '+cls;clearTimeout(tt);tt=setTimeout(()=>el.className='toast',1600)}
+function newList(){
+  const pool=[...ITEMS.keys()].sort(()=>Math.random()-.5);targets=pool.slice(0,level);got=new Set();
+  $('round').textContent=round;render();
+  document.querySelectorAll('[data-idx]').forEach(b=>b.parentNode.setAttribute('visible',true));
+}
+function render(){
+  const all=got.size===targets.length;
+  $('listTitle').textContent=all?'都找齊了！轉身到收銀台結帳':'購物清單：找到並點選商品';
+  $('list').innerHTML=targets.map(i=>`<span class="chip ${got.has(i)?'done':''}"><span class="e">${ITEMS[i].e}</span>${ITEMS[i].n}</span>`).join('');
+}
+function speakList(){say('請幫我買：'+targets.map(i=>ITEMS[i].n).join('、'))}
+document.querySelector('a-scene').addEventListener('click',e=>{
+  const el=e.target;if(!el.classList||!el.classList.contains('clickable'))return;
+  if(el.id==='register'){
+    if(got.size===targets.length){score+=10;$('score').textContent=score;toast('🎉 結帳完成！','win');say('結帳完成，好棒！');round++;setTimeout(newList,1500);}
+    else{toast('還有東西沒拿喔','bad');say('還有東西沒拿喔');}
+    return;
+  }
+  const idx=+el.dataset.idx;
+  if(targets.includes(idx)&&!got.has(idx)){
+    got.add(idx);score+=2;$('score').textContent=score;render();toast(ITEMS[idx].e+' 拿到'+ITEMS[idx].n+'了！','good');say('拿到'+ITEMS[idx].n);
+    el.parentNode.setAttribute('visible',false);
+    if(got.size===targets.length)setTimeout(()=>say('都找齊了，轉身去收銀台結帳'),900);
+  }else if(!got.has(idx)){
+    toast(ITEMS[idx].n+' 不在清單上喔','bad');say(ITEMS[idx].n+'不在清單上');
+    el.setAttribute('animation__shake',{property:'rotation',from:'0 0 -8',to:'0 0 8',dur:80,dir:'alternate',loop:4,easing:'linear'});
+    setTimeout(()=>{el.removeAttribute('animation__shake');el.setAttribute('rotation','0 0 0')},500);
+  }
+});
+$('speak').onclick=speakList;
+$('next').onclick=()=>{newList();speakList()};
+document.querySelectorAll('.lvl button').forEach(b=>b.onclick=()=>{
+  level=+b.dataset.n;document.querySelectorAll('.lvl button').forEach(x=>x.setAttribute('aria-pressed',x===b));newList();
+});
+newList();
+</script>
+
+</body></html>

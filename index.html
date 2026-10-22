@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>特教 VR／AR 體驗</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap">
+<style>
+:root{--bg:#eef4f2;--fg:#14201f;--muted:#4f625e;--card:#ffffff;--mint:#2f9e83;--water:#2a8fc4;
+  --font:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#14201f;--fg:#eef4f2;--muted:#a9bcb7;--card:#1e2e2c;--mint:#4fd1ad;--water:#5ab8ea;color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);
+  padding:max(28px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+main{max-width:560px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:28px;font-weight:900;margin:0;text-wrap:balance}
+p{color:var(--muted);margin:0;line-height:1.7}
+a.card{display:grid;gap:6px;background:var(--card);border-radius:18px;padding:18px;text-decoration:none;color:var(--fg)}
+a.card b{font-size:20px}
+a.card span{color:var(--muted);font-size:15px;line-height:1.6}
+.tag{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--mint)}
+.ar .tag{color:var(--water)}
+a.card:focus-visible{outline:3px solid var(--mint)}
+</style>
+</head>
+<body>
+<main>
+  <h1>特教 VR／AR 體驗</h1>
+  <p>用手機或 VR 頭盔的瀏覽器開啟。AR 需要允許相機。</p>
+  <a class="card" href="vr-store.html"><span class="tag">VR</span><b>🛒 虛擬超商購物練習</b><span>依購物清單在 3D 超商找商品，拿齊後到收銀台結帳。</span></a>
+  <a class="card ar" href="ar-handwash.html"><span class="tag">AR</span><b>🧼 洗手五步驟</b><span>鏡頭對準 Hiro 標記，跳出「濕、搓、沖、捧、擦」步驟卡與動畫。</span></a>
+  <p><a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" style="color:var(--water)">下載 Hiro 標記圖</a>（列印或用另一台裝置顯示）</p>
+</main>
+</body>
+</html>
